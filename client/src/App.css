@@ -1,0 +1,47 @@
+/* Global dark theme styles */
+body {
+  background-color: #111827; /* gray-900 */
+  color: #f9fafb; /* gray-50 */
+}
+
+/* Meeting application specific styles */
+.meeting-app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Video container styles */
+.video-container {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background-color: #1f2937; /* gray-800 */
+}
+
+.video-container.self {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.video-container.remote {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Control buttons */
+.control-button {
+  transition: all 0.2s ease;
+  transform: translateY(0);
+}
+
+.control-button:hover {
+  transform: translateY(-2px);
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
