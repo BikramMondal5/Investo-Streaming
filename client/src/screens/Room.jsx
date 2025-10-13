@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useState } from "react";
+import React, { useEffect, useCallback, useState, useRef } from "react";
 import ReactPlayer from "react-player";
 import peer from "../service/peer";
 import { useSocket } from "../context/SocketProvider";
@@ -10,6 +10,9 @@ const RoomPage = () => {
   const [remoteStream, setRemoteStream] = useState();
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenSharingStream, setScreenSharingStream] = useState(null);
+  const normalVideoStream = useRef(null);
 
   const handleUserJoined = useCallback(({ email, id }) => {
     console.log(`Email ${email} joined room`);
@@ -42,9 +45,24 @@ const RoomPage = () => {
   );
 
   const sendStreams = useCallback(() => {
-    for (const track of myStream.getTracks()) {
-      peer.peer.addTrack(track, myStream);
-    }
+    if (!myStream) return;
+    
+    // Check if there are existing senders to avoid adding duplicate tracks
+    const senders = peer.peer.getSenders();
+    const tracks = myStream.getTracks();
+    
+    tracks.forEach((track) => {
+      // Check if this track or one of the same kind is already being sent
+      const sender = senders.find(s => s.track && s.track.kind === track.kind);
+      
+      if (sender) {
+        // Replace the track if there's already a sender of this kind
+        sender.replaceTrack(track);
+      } else {
+        // Add the track if there's no sender yet
+        peer.peer.addTrack(track, myStream);
+      }
+    });
   }, [myStream]);
 
   const handleCallAccepted = useCallback(
@@ -96,6 +114,11 @@ const RoomPage = () => {
     socket.on("peer:nego:final", handleNegoNeedFinal);
 
     return () => {
+      // Clean up screen sharing when component unmounts
+      if (screenSharingStream) {
+        screenSharingStream.getTracks().forEach(track => track.stop());
+      }
+      
       socket.off("user:joined", handleUserJoined);
       socket.off("incomming:call", handleIncommingCall);
       socket.off("call:accepted", handleCallAccepted);
@@ -109,6 +132,7 @@ const RoomPage = () => {
     handleCallAccepted,
     handleNegoNeedIncomming,
     handleNegoNeedFinal,
+    screenSharingStream,
   ]);
 
   // Functions to handle mute/unmute and camera on/off
@@ -132,6 +156,75 @@ const RoomPage = () => {
     }
   }, [isCameraOff, myStream]);
 
+  // Start screen sharing
+  const startScreenShare = useCallback(async () => {
+    try {
+      // Save the current video stream to restore later
+      if (myStream && !normalVideoStream.current) {
+        normalVideoStream.current = myStream;
+      }
+      
+      // Get screen sharing stream
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true
+      });
+      
+      // Handle the case when user cancels screen share dialog
+      screenStream.getVideoTracks()[0].onended = () => {
+        stopScreenShare();
+      };
+      
+      setScreenSharingStream(screenStream);
+      setIsScreenSharing(true);
+      
+      // Replace the current stream with screen sharing stream
+      setMyStream(screenStream);
+      
+      // Replace the tracks that are being sent
+      const senders = peer.peer.getSenders();
+      const videoSender = senders.find(sender => 
+        sender.track && sender.track.kind === 'video'
+      );
+      
+      if (videoSender) {
+        videoSender.replaceTrack(screenStream.getVideoTracks()[0]);
+      }
+      
+    } catch (error) {
+      console.error('Error starting screen share:', error);
+    }
+  }, [myStream]);
+  
+  // Stop screen sharing
+  const stopScreenShare = useCallback(async () => {
+    try {
+      if (screenSharingStream) {
+        screenSharingStream.getTracks().forEach(track => track.stop());
+        setScreenSharingStream(null);
+      }
+      
+      // Restore the original video stream
+      if (normalVideoStream.current) {
+        setMyStream(normalVideoStream.current);
+        
+        // Replace the screen sharing track with the original video track
+        const senders = peer.peer.getSenders();
+        const videoSender = senders.find(sender => 
+          sender.track && sender.track.kind === 'video'
+        );
+        
+        if (videoSender && normalVideoStream.current.getVideoTracks()[0]) {
+          videoSender.replaceTrack(normalVideoStream.current.getVideoTracks()[0]);
+        }
+      }
+      
+      setIsScreenSharing(false);
+    } catch (error) {
+      console.error('Error stopping screen share:', error);
+    }
+  }, [screenSharingStream]);
+
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col">
       {/* Header */}
@@ -140,7 +233,7 @@ const RoomPage = () => {
           <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
           </svg>
-          <h1 className="ml-2 text-xl font-semibold text-white">Meeting Room</h1>
+          <h1 className="ml-2 text-xl font-bold text-white">Investor-Hunter</h1>
         </div>
         <div className="flex items-center space-x-2">
           <div className={`px-3 py-1 rounded-full text-sm ${remoteSocketId ? "bg-green-500 text-white" : "bg-gray-600 text-gray-300"}`}>
@@ -163,7 +256,7 @@ const RoomPage = () => {
                   width="100%"
                   height="100%"
                   url={remoteStream}
-                  style={{ objectFit: "cover" }}
+                  style={{ objectFit: "contain" }}
                 />
                 <div className="absolute bottom-4 left-4 bg-gray-900 bg-opacity-70 px-3 py-1 rounded-lg text-white text-sm">
                   Remote User
@@ -189,10 +282,15 @@ const RoomPage = () => {
                   width="100%"
                   height="100%"
                   url={myStream}
-                  style={{ objectFit: "cover" }}
+                  style={{ objectFit: isScreenSharing ? "contain" : "cover" }}
                 />
-                <div className="absolute bottom-4 left-4 bg-gray-900 bg-opacity-70 px-3 py-1 rounded-lg text-white text-sm">
-                  You
+                <div className="absolute bottom-4 left-4 bg-gray-900 bg-opacity-70 px-3 py-1 rounded-lg text-white text-sm flex items-center">
+                  {isScreenSharing && (
+                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  )}
+                  You {isScreenSharing ? '(Screen)' : ''}
                 </div>
               </div>
             ) : (
@@ -241,6 +339,23 @@ const RoomPage = () => {
                 ) : (
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                )}
+              </button>
+              
+              {/* Screen Share Button */}
+              <button 
+                onClick={isScreenSharing ? stopScreenShare : startScreenShare}
+                className={`p-3 rounded-full ${isScreenSharing ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'} transition-colors`}
+                title={isScreenSharing ? "Stop sharing screen" : "Share screen"}
+              >
+                {isScreenSharing ? (
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                  </svg>
+                ) : (
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                   </svg>
                 )}
               </button>
