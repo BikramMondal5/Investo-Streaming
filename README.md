@@ -1,16 +1,61 @@
-# React + Vite
+# 📺🎥 Investo-Streaming
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Investo-Streaming is a modern platform designed to provide seamless video streaming capabilities. Whether you're hosting a virtual meeting, streaming live events, or sharing content, Investo-Streaming ensures a smooth and interactive experience.
 
-Currently, two official plugins are available:
+## 🌟 Features
+- 🎙️ Real-time Audio and Video Streaming
+- 🏠 Lobby and Room Management for Meetings
+- 🔗 Peer-to-Peer Connections with WebRTC
+- 📡 Socket-based Communication for Low Latency
+- 🎨 Responsive and Modern UI with TailwindCSS
+- 🔒 Secure and Scalable Architecture
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🛠️ Technologies Used
+- React.js – Frontend framework
+- TailwindCSS – Styling and responsive UI
+- Node.js / Express – Backend APIs
+- WebRTC – Real-time communication
+- Socket.IO – Low-latency communication
+- Vite – Fast development build tool
 
-## React Compiler
+## ⚙️ Installation
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. Clone the repository:
+```bash
+git clone https://github.com/BikramMondal5/Investo-Streaming.git
+```
+2. Navigate to the project directory:
+```bash
+cd Investo-Streaming
+```
+3. Install dependencies for both client and server:
+```bash
+cd client && npm install
+cd ../server && npm install
+```
+4. Start the development servers:
+```bash
+# Start the client
+cd client && npm start
 
-## Expanding the ESLint configuration
+# Start the server
+cd ../server && npm start
+```
+5. Open your browser and navigate to `http://localhost:3000` to view the app.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+## 🚀 How to Use
+
+- 🏠 Start in the Lobby and create or join a room.
+- 🎥 Share your video and audio in real-time.
+- 🔗 Invite others to join your room with a unique link.
+- 📡 Enjoy seamless communication with low latency.
+
+## 🤝 Contribution
+
+**Found a bug? 🐞 Have a feature request?**
+- Open an issue or submit a pull request — contributions are always welcome!
+
+## 📜 License
+
+This project is licensed under the `MIT License`.
