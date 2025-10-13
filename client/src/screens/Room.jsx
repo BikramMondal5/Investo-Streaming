@@ -157,7 +157,7 @@ const RoomPage = () => {
           <div className="grid grid-cols-2 gap-4 w-full">
             {/* Remote Stream */}
             {remoteStream ? (
-              <div className="bg-gray-800 rounded-lg overflow-hidden shadow-lg relative h-72">
+              <div className="bg-gray-800 rounded-lg overflow-hidden shadow-lg relative h-90">
                 <ReactPlayer
                   playing
                   width="100%"
@@ -182,7 +182,7 @@ const RoomPage = () => {
 
             {/* My Stream */}
             {myStream ? (
-              <div className="bg-gray-800 rounded-lg overflow-hidden shadow-lg relative h-72">
+              <div className="bg-gray-800 rounded-lg overflow-hidden shadow-lg relative h-90">
                 <ReactPlayer
                   playing
                   muted
