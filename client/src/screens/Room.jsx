@@ -153,47 +153,59 @@ const RoomPage = () => {
       <div className="flex-1 p-4 flex flex-col">
         {/* Video Area */}
         <div className="flex flex-1 gap-4 mb-4 overflow-hidden">
-          {/* Remote Stream - Main Video */}
-          {remoteStream ? (
-            <div className="flex-1 bg-gray-800 rounded-lg overflow-hidden shadow-lg relative">
-              <ReactPlayer
-                playing
-                width="100%"
-                height="100%"
-                url={remoteStream}
-                style={{ objectFit: "cover" }}
-              />
-              <div className="absolute bottom-4 left-4 bg-gray-900 bg-opacity-70 px-3 py-1 rounded-lg text-white text-sm">
-                Remote User
+          {/* Container to hold both streams with equal size */}
+          <div className="grid grid-cols-2 gap-4 w-full">
+            {/* Remote Stream */}
+            {remoteStream ? (
+              <div className="bg-gray-800 rounded-lg overflow-hidden shadow-lg relative h-72">
+                <ReactPlayer
+                  playing
+                  width="100%"
+                  height="100%"
+                  url={remoteStream}
+                  style={{ objectFit: "cover" }}
+                />
+                <div className="absolute bottom-4 left-4 bg-gray-900 bg-opacity-70 px-3 py-1 rounded-lg text-white text-sm">
+                  Remote User
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="flex-1 bg-gray-800 rounded-lg flex items-center justify-center text-gray-500">
-              <div className="text-center">
-                <svg className="mx-auto h-16 w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                <p className="mt-2">Waiting for remote stream</p>
+            ) : (
+              <div className="bg-gray-800 rounded-lg flex items-center justify-center text-gray-500 h-72">
+                <div className="text-center">
+                  <svg className="mx-auto h-16 w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  <p className="mt-2">Waiting for remote stream</p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* My Stream - Small Video */}
-          {myStream && (
-            <div className="w-72 h-48 bg-gray-800 rounded-lg overflow-hidden shadow-lg relative">
-              <ReactPlayer
-                playing
-                muted
-                width="100%"
-                height="100%"
-                url={myStream}
-                style={{ objectFit: "cover" }}
-              />
-              <div className="absolute bottom-4 left-4 bg-gray-900 bg-opacity-70 px-3 py-1 rounded-lg text-white text-sm">
-                You
+            {/* My Stream */}
+            {myStream ? (
+              <div className="bg-gray-800 rounded-lg overflow-hidden shadow-lg relative h-72">
+                <ReactPlayer
+                  playing
+                  muted
+                  width="100%"
+                  height="100%"
+                  url={myStream}
+                  style={{ objectFit: "cover" }}
+                />
+                <div className="absolute bottom-4 left-4 bg-gray-900 bg-opacity-70 px-3 py-1 rounded-lg text-white text-sm">
+                  You
+                </div>
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="bg-gray-800 rounded-lg flex items-center justify-center text-gray-500 h-72">
+                <div className="text-center">
+                  <svg className="mx-auto h-16 w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  <p className="mt-2">Waiting for your stream</p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Controls */}
