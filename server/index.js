@@ -1,7 +1,14 @@
 const { Server } = require("socket.io");
 
-const io = new Server(8000, {
-  cors: true,
+const PORT = process.env.PORT || 8000;
+
+const io = new Server(PORT, {
+  cors: {
+    origin: process.env.CLIENT_URL || "*", // Update with your Vercel client URL
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  transports: ['websocket', 'polling']
 });
 
 const emailToSocketIdMap = new Map();
@@ -9,6 +16,7 @@ const socketidToEmailMap = new Map();
 
 io.on("connection", (socket) => {
   console.log(`Socket Connected`, socket.id);
+  
   socket.on("room:join", (data) => {
     const { email, room } = data;
     emailToSocketIdMap.set(email, socket.id);
@@ -35,4 +43,15 @@ io.on("connection", (socket) => {
     console.log("peer:nego:done", ans);
     io.to(to).emit("peer:nego:final", { from: socket.id, ans });
   });
+
+  socket.on("disconnect", () => {
+    console.log(`Socket Disconnected`, socket.id);
+    const email = socketidToEmailMap.get(socket.id);
+    if (email) {
+      emailToSocketIdMap.delete(email);
+      socketidToEmailMap.delete(socket.id);
+    }
+  });
 });
+
+console.log(`Server running on port ${PORT}`);
