@@ -2,9 +2,18 @@ import React, { useEffect, useCallback, useState, useRef } from "react";
 import ReactPlayer from "react-player";
 import peer from "../service/peer";
 import { useSocket } from "../context/SocketProvider";
+import { useNavigate } from "react-router-dom";
+import { 
+  Mic, MicOff, Video, VideoOff, MonitorUp, Users, 
+  MessageSquare, Settings, MoreVertical, PhoneOff, Phone,
+  Hand, Smile, Layout, ChevronDown, Radio, Clock,
+  Shield, Volume2, VolumeX, Maximize2, Copy, Palette,
+  FileText, UsersRound, Power
+} from "lucide-react";
 
 const RoomPage = () => {
   const socket = useSocket();
+  const navigate = useNavigate();
   const [remoteSocketId, setRemoteSocketId] = useState(null);
   const [myStream, setMyStream] = useState();
   const [remoteStream, setRemoteStream] = useState();
@@ -12,6 +21,14 @@ const RoomPage = () => {
   const [isCameraOff, setIsCameraOff] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [screenSharingStream, setScreenSharingStream] = useState(null);
+  const [isHandRaised, setIsHandRaised] = useState(false);
+  const [remoteHandRaised, setRemoteHandRaised] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [showParticipants, setShowParticipants] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [meetingDuration, setMeetingDuration] = useState(0);
   const normalVideoStream = useRef(null);
 
   const handleUserJoined = useCallback(({ email, id }) => {
@@ -98,6 +115,11 @@ const RoomPage = () => {
     await peer.setLocalDescription(ans);
   }, []);
 
+  // Handle remote user hand raise
+  const handleRemoteHandRaise = useCallback(({ isRaised }) => {
+    setRemoteHandRaised(isRaised);
+  }, []);
+
   useEffect(() => {
     peer.peer.addEventListener("track", async (ev) => {
       const remoteStream = ev.streams;
@@ -106,12 +128,34 @@ const RoomPage = () => {
     });
   }, []);
 
+  // Meeting duration timer
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setMeetingDuration(prev => prev + 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showMoreOptions && !event.target.closest('.relative')) {
+        setShowMoreOptions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMoreOptions]);
+
   useEffect(() => {
     socket.on("user:joined", handleUserJoined);
     socket.on("incomming:call", handleIncommingCall);
     socket.on("call:accepted", handleCallAccepted);
     socket.on("peer:nego:needed", handleNegoNeedIncomming);
     socket.on("peer:nego:final", handleNegoNeedFinal);
+    socket.on("hand:raised", handleRemoteHandRaise);
 
     return () => {
       // Clean up screen sharing when component unmounts
@@ -124,6 +168,7 @@ const RoomPage = () => {
       socket.off("call:accepted", handleCallAccepted);
       socket.off("peer:nego:needed", handleNegoNeedIncomming);
       socket.off("peer:nego:final", handleNegoNeedFinal);
+      socket.off("hand:raised", handleRemoteHandRaise);
     };
   }, [
     socket,
@@ -132,6 +177,7 @@ const RoomPage = () => {
     handleCallAccepted,
     handleNegoNeedIncomming,
     handleNegoNeedFinal,
+    handleRemoteHandRaise,
     screenSharingStream,
   ]);
 
@@ -225,19 +271,195 @@ const RoomPage = () => {
     }
   }, [screenSharingStream]);
 
+  // End call and leave room
+  const handleEndCall = useCallback(() => {
+    // Stop all media tracks
+    if (myStream) {
+      myStream.getTracks().forEach(track => track.stop());
+    }
+    if (screenSharingStream) {
+      screenSharingStream.getTracks().forEach(track => track.stop());
+    }
+    
+    // Close peer connection
+    if (peer.peer) {
+      peer.peer.close();
+    }
+    
+    // Navigate back to lobby
+    navigate('/');
+  }, [myStream, screenSharingStream, navigate]);
+
+  // Toggle hand raise and broadcast to remote user
+  const toggleHandRaise = useCallback(() => {
+    const newHandRaisedState = !isHandRaised;
+    setIsHandRaised(newHandRaisedState);
+    
+    // Broadcast hand raise state to remote user
+    if (remoteSocketId) {
+      socket.emit("hand:raised", { to: remoteSocketId, isRaised: newHandRaisedState });
+    }
+  }, [isHandRaised, remoteSocketId, socket]);
+
+  // Copy invite link to clipboard
+  const copyInviteLink = useCallback(() => {
+    const inviteLink = window.location.href;
+    navigator.clipboard.writeText(inviteLink)
+      .then(() => {
+        alert('Invite link copied to clipboard!');
+      })
+      .catch(err => {
+        console.error('Failed to copy link:', err);
+      });
+  }, []);
+
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col">
-      {/* Header */}
-      <header className="bg-gray-800 px-6 py-3 shadow-md flex items-center justify-between">
-        <div className="flex items-center">
-          <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-          </svg>
-          <h1 className="ml-2 text-xl font-bold text-white">Investor-Hunter</h1>
-        </div>
-        <div className="flex items-center space-x-2">
-          <div className={`px-3 py-1 rounded-full text-sm ${remoteSocketId ? "bg-green-500 text-white" : "bg-gray-600 text-gray-300"}`}>
-            {remoteSocketId ? "Connected" : "Waiting for participants"}
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex flex-col">
+      {/* Enhanced Header/Navbar */}
+      <header className="bg-gray-900/95 backdrop-blur-md border-b border-gray-700 px-6 py-3 shadow-xl">
+        <div className="flex items-center justify-between">
+          {/* Left Section - Logo and Meeting Info */}
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center">
+              <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-2 rounded-lg">
+                <Video className="w-6 h-6 text-white" />
+              </div>
+              <h1 className="ml-3 text-xl font-bold text-white">Investo-Streaming</h1>
+            </div>
+            
+            {/* Meeting Duration */}
+            <div className="hidden md:flex items-center space-x-2 bg-gray-800 px-3 py-1.5 rounded-lg">
+              <Clock className="w-4 h-4 text-gray-400" />
+              <span className="text-sm text-gray-300">
+                {Math.floor(meetingDuration / 60)}:{String(meetingDuration % 60).padStart(2, '0')}
+              </span>
+            </div>
+
+            {/* Recording Indicator */}
+            {isRecording && (
+              <div className="flex items-center space-x-2 bg-red-600/20 border border-red-500 px-3 py-1.5 rounded-lg animate-pulse">
+                <Radio className="w-4 h-4 text-red-500" />
+                <span className="text-sm text-red-400 font-medium">Recording</span>
+              </div>
+            )}
+          </div>
+
+          {/* Center Section - Connection Status */}
+          <div className="hidden lg:flex items-center">
+            <div className={`flex items-center space-x-2 px-4 py-2 rounded-full border transition-all ${
+              remoteSocketId 
+                ? "bg-green-500/20 border-green-500 text-green-400" 
+                : "bg-yellow-500/20 border-yellow-500 text-yellow-400"
+            }`}>
+              <div className={`w-2 h-2 rounded-full ${remoteSocketId ? 'bg-green-500' : 'bg-yellow-500'} animate-pulse`}></div>
+              <Shield className="w-4 h-4" />
+              <span className="text-sm font-medium">
+                {remoteSocketId ? "Secure Connection" : "Waiting for participants"}
+              </span>
+            </div>
+          </div>
+
+          {/* Right Section - Action Buttons */}
+          <div className="flex items-center space-x-2">
+            {/* Participant Count */}
+            <button 
+              onClick={() => setShowParticipants(!showParticipants)}
+              className="hidden sm:flex items-center space-x-2 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg transition-all group"
+            >
+              <Users className="w-5 h-5 text-gray-300 group-hover:text-white" />
+              <span className="text-sm text-gray-300 group-hover:text-white font-medium">
+                {remoteSocketId ? '2' : '1'}
+              </span>
+            </button>
+
+            {/* Chat Toggle */}
+            {/* <button 
+              onClick={() => setShowChat(!showChat)}
+              className={`p-2.5 rounded-lg transition-all ${
+                showChat 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white'
+              }`}
+              title="Toggle Chat"
+            >
+              <MessageSquare className="w-5 h-5" />
+            </button> */}
+
+            {/* Layout Toggle */}
+            <button 
+              className="p-2.5 bg-gray-800 hover:bg-gray-700 rounded-lg transition-all text-gray-300 hover:text-white"
+              title="Change Layout"
+            >
+              <Layout className="w-5 h-5" />
+            </button>
+
+            {/* Settings */}
+            <button 
+              onClick={() => setShowSettings(!showSettings)}
+              className={`p-2.5 rounded-lg transition-all ${
+                showSettings 
+                  ? 'bg-gray-700 text-white' 
+                  : 'bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white'
+              }`}
+              title="Settings"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+
+            {/* More Options */}
+            <div className="relative">
+              <button 
+                onClick={() => setShowMoreOptions(!showMoreOptions)}
+                className={`p-2.5 rounded-lg transition-all ${
+                  showMoreOptions 
+                    ? 'bg-gray-700 text-white' 
+                    : 'bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white'
+                }`}
+                title="More Options"
+              >
+                <MoreVertical className="w-5 h-5" />
+              </button>
+              
+              {/* Dropdown Menu */}
+              {showMoreOptions && (
+                <div className="absolute right-0 top-full mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl -z-50">
+                  <div className="py-2">
+                    {/* Recorded Videos */}
+                    <button className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition-all flex items-center space-x-3 group">
+                      <Radio className="w-4 h-4 text-gray-400 group-hover:text-white" />
+                      <span className="text-sm font-medium">Recorded videos</span>
+                    </button>
+                    
+                    {/* Virtual Background */}
+                    <button className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition-all flex items-center space-x-3 group">
+                      <Palette className="w-4 h-4 text-gray-400 group-hover:text-white" />
+                      <span className="text-sm font-medium">Virtual background</span>
+                    </button>
+                    
+                    {/* Whiteboard */}
+                    <button className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition-all flex items-center space-x-3 group">
+                      <FileText className="w-4 h-4 text-gray-400 group-hover:text-white" />
+                      <span className="text-sm font-medium">Whiteboard</span>
+                    </button>
+                    
+                    {/* Breakout Rooms */}
+                    <button className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition-all flex items-center space-x-3 group">
+                      <UsersRound className="w-4 h-4 text-gray-400 group-hover:text-white" />
+                      <span className="text-sm font-medium">Breakout rooms</span>
+                    </button>
+                    
+                    {/* Divider */}
+                    <div className="border-t border-gray-700 my-1"></div>
+                    
+                    {/* End Meeting for All */}
+                    <button className="w-full px-4 py-3 text-left text-red-400 hover:bg-red-600/20 hover:text-red-300 transition-all flex items-center space-x-3 group">
+                      <Power className="w-4 h-4 text-red-400 group-hover:text-red-300" />
+                      <span className="text-sm font-medium">End meeting for all</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -250,7 +472,7 @@ const RoomPage = () => {
           <div className="grid grid-cols-2 gap-4 w-full">
             {/* Remote Stream */}
             {remoteStream ? (
-              <div className="bg-gray-800 rounded-lg overflow-hidden shadow-lg relative h-90">
+              <div className="bg-gray-800 rounded-xl overflow-hidden shadow-2xl relative h-90 border border-gray-700 hover:border-blue-500 transition-all">
                 <ReactPlayer
                   playing
                   width="100%"
@@ -258,24 +480,39 @@ const RoomPage = () => {
                   url={remoteStream}
                   style={{ objectFit: "contain" }}
                 />
-                <div className="absolute bottom-4 left-4 bg-gray-900 bg-opacity-70 px-3 py-1 rounded-lg text-white text-sm">
-                  Remote User
+                <div className="absolute bottom-4 left-4 bg-gray-900/90 backdrop-blur-sm px-4 py-2 rounded-lg text-white text-sm flex items-center space-x-2 border border-gray-700">
+                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                  <span className="font-medium">Remote User</span>
+                </div>
+                {/* Remote User Hand Raised Indicator */}
+                {remoteHandRaised && (
+                  <div className="absolute top-4 left-4 bg-yellow-500 px-3 py-2 rounded-lg flex items-center space-x-2 animate-bounce">
+                    <Hand className="w-5 h-5 text-white" />
+                    <span className="text-white font-medium text-sm">Hand Raised</span>
+                  </div>
+                )}
+                {/* Video Controls Overlay */}
+                <div className="absolute top-4 right-4 flex space-x-2">
+                  <button className="p-2 bg-gray-900/80 hover:bg-gray-800 rounded-lg transition-all">
+                    <Maximize2 className="w-4 h-4 text-white" />
+                  </button>
                 </div>
               </div>
             ) : (
-              <div className="bg-gray-800 rounded-lg flex items-center justify-center text-gray-500 h-72">
+              <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl flex items-center justify-center text-gray-500 h-72 border border-gray-700 border-dashed">
                 <div className="text-center">
-                  <svg className="mx-auto h-16 w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  <p className="mt-2">Waiting for remote stream</p>
+                  <div className="bg-gray-700/50 p-4 rounded-full mx-auto w-fit mb-4">
+                    <Users className="h-16 w-16 text-gray-400" />
+                  </div>
+                  <p className="text-lg font-medium">Waiting for remote stream</p>
+                  <p className="text-sm text-gray-600 mt-1">Participant will appear here</p>
                 </div>
               </div>
             )}
 
             {/* My Stream */}
             {myStream ? (
-              <div className="bg-gray-800 rounded-lg overflow-hidden shadow-lg relative h-90">
+              <div className="bg-gray-800 rounded-xl overflow-hidden shadow-2xl relative h-90 border border-gray-700 hover:border-purple-500 transition-all">
                 <ReactPlayer
                   playing
                   muted
@@ -284,116 +521,189 @@ const RoomPage = () => {
                   url={myStream}
                   style={{ objectFit: isScreenSharing ? "contain" : "cover" }}
                 />
-                <div className="absolute bottom-4 left-4 bg-gray-900 bg-opacity-70 px-3 py-1 rounded-lg text-white text-sm flex items-center">
-                  {isScreenSharing && (
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                  )}
-                  You {isScreenSharing ? '(Screen)' : ''}
+                <div className="absolute bottom-4 left-4 bg-gray-900/90 backdrop-blur-sm px-4 py-2 rounded-lg text-white text-sm flex items-center space-x-2 border border-gray-700">
+                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                  {isScreenSharing && <MonitorUp className="w-4 h-4 text-blue-400" />}
+                  <span className="font-medium">You {isScreenSharing ? '(Sharing)' : ''}</span>
                 </div>
+                {/* Hand Raised Indicator */}
+                {isHandRaised && (
+                  <div className="absolute top-4 left-4 bg-yellow-500 px-3 py-2 rounded-lg flex items-center space-x-2 animate-bounce">
+                    <Hand className="w-5 h-5 text-white" />
+                    <span className="text-white font-medium text-sm">Hand Raised</span>
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="bg-gray-800 rounded-lg flex items-center justify-center text-gray-500 h-72">
+              <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl flex items-center justify-center text-gray-500 h-72 border border-gray-700 border-dashed">
                 <div className="text-center">
-                  <svg className="mx-auto h-16 w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  <p className="mt-2">Waiting for your stream</p>
+                  <div className="bg-gray-700/50 p-4 rounded-full mx-auto w-fit mb-4">
+                    <Video className="h-16 w-16 text-gray-400" />
+                  </div>
+                  <p className="text-lg font-medium">Camera Off</p>
+                  <p className="text-sm text-gray-600 mt-1">Turn on your camera to start</p>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Controls */}
-        <div className="bg-gray-800 p-4 rounded-lg flex justify-center space-x-4">
-          {myStream && (
-            <>
-              <button 
-                onClick={toggleMute}
-                className={`p-3 rounded-full ${isMuted ? 'bg-red-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'} transition-colors`}
-              >
-                {isMuted ? (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" clipRule="evenodd" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-                  </svg>
-                ) : (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                  </svg>
-                )}
-              </button>
+        {/* Enhanced Controls Bar */}
+        <div className="bg-gray-900/95 backdrop-blur-md border border-gray-700 p-4 rounded-xl shadow-2xl">
+          <div className="flex items-center justify-between">
+            {/* Left Controls - Audio/Video */}
+            <div className="flex items-center space-x-3">
+              {myStream && (
+                <>
+                  {/* Microphone Control */}
+                  <div className="relative group">
+                    <button 
+                      onClick={toggleMute}
+                      className={`p-4 rounded-xl transition-all duration-200 ${
+                        isMuted 
+                          ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/50' 
+                          : 'bg-gray-800 hover:bg-gray-700 text-white'
+                      }`}
+                      title={isMuted ? "Unmute" : "Mute"}
+                    >
+                      {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                    </button>
+                    {/* <ChevronDown className="absolute -bottom-1 right-1 w-4 h-4 text-gray-400 group-hover:text-white cursor-pointer" /> */}
+                  </div>
 
-              <button 
-                onClick={toggleCamera}
-                className={`p-3 rounded-full ${isCameraOff ? 'bg-red-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'} transition-colors`}
-              >
-                {isCameraOff ? (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 12H6" />
-                  </svg>
-                ) : (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                )}
-              </button>
-              
-              {/* Screen Share Button */}
-              <button 
-                onClick={isScreenSharing ? stopScreenShare : startScreenShare}
-                className={`p-3 rounded-full ${isScreenSharing ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'} transition-colors`}
-                title={isScreenSharing ? "Stop sharing screen" : "Share screen"}
-              >
-                {isScreenSharing ? (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                  </svg>
-                ) : (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                )}
-              </button>
-              
-              <button 
-                onClick={sendStreams}
-                className="p-3 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
-                </svg>
-              </button>
-              
-              {remoteSocketId && !remoteStream && (
+                  {/* Camera Control */}
+                  <div className="relative group">
+                    <button 
+                      onClick={toggleCamera}
+                      className={`p-4 rounded-xl transition-all duration-200 ${
+                        isCameraOff 
+                          ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/50' 
+                          : 'bg-gray-800 hover:bg-gray-700 text-white'
+                      }`}
+                      title={isCameraOff ? "Turn on camera" : "Turn off camera"}
+                    >
+                      {isCameraOff ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
+                    </button>
+                    {/* <ChevronDown className="absolute -bottom-1 right-1 w-4 h-4 text-gray-400 group-hover:text-white cursor-pointer" /> */}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Center Controls - Main Actions */}
+            <div className="flex items-center space-x-3">
+              {myStream && (
+                <>
+                  {/* Screen Share */}
+                  <button 
+                    onClick={isScreenSharing ? stopScreenShare : startScreenShare}
+                    className={`px-4 py-3 rounded-xl transition-all duration-200 flex items-center space-x-2 ${
+                      isScreenSharing 
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/50' 
+                        : 'bg-gray-800 hover:bg-gray-700 text-white'
+                    }`}
+                    title={isScreenSharing ? "Stop sharing" : "Share screen"}
+                  >
+                    <MonitorUp className="w-5 h-5" />
+                    <span className="text-sm font-medium hidden sm:inline">
+                      {isScreenSharing ? "Stop Share" : "Share"}
+                    </span>
+                  </button>
+
+                  {/* Reactions */}
+                  <button 
+                    className="p-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl transition-all"
+                    title="Reactions"
+                  >
+                    <Smile className="w-5 h-5" />
+                  </button>
+
+                  {/* Raise Hand */}
+                  <button 
+                    onClick={toggleHandRaise}
+                    className={`p-3 rounded-xl transition-all duration-200 ${
+                      isHandRaised 
+                        ? 'bg-yellow-500 hover:bg-yellow-600 text-white shadow-lg shadow-yellow-500/50' 
+                        : 'bg-gray-800 hover:bg-gray-700 text-white'
+                    }`}
+                    title={isHandRaised ? "Lower hand" : "Raise hand"}
+                  >
+                    <Hand className="w-5 h-5" />
+                  </button>
+
+                  {/* Record Button */}
+                  <button 
+                    onClick={() => setIsRecording(!isRecording)}
+                    className={`px-4 py-3 rounded-xl transition-all duration-200 flex items-center space-x-2 ${
+                      isRecording 
+                        ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/50' 
+                        : 'bg-gray-800 hover:bg-gray-700 text-white'
+                    }`}
+                    title={isRecording ? "Stop recording" : "Start recording"}
+                  >
+                    <Radio className={`w-5 h-5 ${isRecording ? 'animate-pulse' : ''}`} />
+                    <span className="text-sm font-medium hidden md:inline">
+                      {isRecording ? "Recording..." : "Record"}
+                    </span>
+                  </button>
+                </>
+              )}
+
+              {/* Call Control - Join Call when no stream */}
+              {!myStream && remoteSocketId && (
                 <button 
                   onClick={handleCallUser}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center"
+                  className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-xl transition-all shadow-lg shadow-green-500/50 flex items-center space-x-2 font-medium"
                 >
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                  </svg>
-                  Start Call
+                  <Phone className="w-5 h-5" />
+                  <span>Join Call</span>
                 </button>
               )}
-            </>
-          )}
-          
-          {!myStream && remoteSocketId && (
+
+              {/* Send My Stream - Available for both users */}
+              {myStream && remoteSocketId && (
+                <button 
+                  onClick={sendStreams}
+                  className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-xl transition-all shadow-lg shadow-green-500/50 flex items-center space-x-2 font-medium"
+                  title="Send my video stream to other user"
+                >
+                  <Phone className="w-5 h-5" />
+                  <span>Send My Stream</span>
+                </button>
+              )}
+            </div>
+
+            {/* Right Controls - End Call */}
+            <div className="flex items-center space-x-3">
+              {/* End Call Button */}
+              <button 
+                onClick={handleEndCall}
+                className="px-5 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl transition-all shadow-lg shadow-red-500/50 flex items-center space-x-2 font-medium"
+                title="End call and leave room"
+              >
+                <PhoneOff className="w-5 h-5" />
+                <span className="hidden md:inline">End</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Info Bar */}
+          <div className="mt-3 pt-3 border-t border-gray-800 flex items-center justify-between text-xs text-gray-400">
+            <div className="flex items-center space-x-4">
+              <span className="flex items-center space-x-1">
+                <Shield className="w-3 h-3" />
+                <span>Encrypted</span>
+              </span>
+              <span>Room ID: {remoteSocketId ? remoteSocketId.substring(0, 8) + '...' : 'N/A'}</span>
+            </div>
             <button 
-              onClick={handleCallUser}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center"
+              onClick={copyInviteLink}
+              className="flex items-center space-x-1 hover:text-blue-400 transition-colors"
             >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-              </svg>
-              Join Call
+              <Copy className="w-3 h-3" />
+              <span>Copy Invite Link</span>
             </button>
-          )}
+          </div>
         </div>
       </div>
     </div>
