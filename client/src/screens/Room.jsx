@@ -7,7 +7,8 @@ import {
   Mic, MicOff, Video, VideoOff, MonitorUp, Users, 
   MessageSquare, Settings, MoreVertical, PhoneOff, Phone,
   Hand, Smile, Layout, ChevronDown, Radio, Clock,
-  Shield, Volume2, VolumeX, Maximize2, Copy
+  Shield, Volume2, VolumeX, Maximize2, Copy, Palette,
+  FileText, UsersRound, Power
 } from "lucide-react";
 
 const RoomPage = () => {
@@ -25,6 +26,7 @@ const RoomPage = () => {
   const [showChat, setShowChat] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [meetingDuration, setMeetingDuration] = useState(0);
   const normalVideoStream = useRef(null);
@@ -134,6 +136,18 @@ const RoomPage = () => {
 
     return () => clearInterval(timer);
   }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showMoreOptions && !event.target.closest('.relative')) {
+        setShowMoreOptions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMoreOptions]);
 
   useEffect(() => {
     socket.on("user:joined", handleUserJoined);
@@ -359,7 +373,7 @@ const RoomPage = () => {
             </button>
 
             {/* Chat Toggle */}
-            <button 
+            {/* <button 
               onClick={() => setShowChat(!showChat)}
               className={`p-2.5 rounded-lg transition-all ${
                 showChat 
@@ -369,7 +383,7 @@ const RoomPage = () => {
               title="Toggle Chat"
             >
               <MessageSquare className="w-5 h-5" />
-            </button>
+            </button> */}
 
             {/* Layout Toggle */}
             <button 
@@ -393,12 +407,59 @@ const RoomPage = () => {
             </button>
 
             {/* More Options */}
-            <button 
-              className="p-2.5 bg-gray-800 hover:bg-gray-700 rounded-lg transition-all text-gray-300 hover:text-white"
-              title="More Options"
-            >
-              <MoreVertical className="w-5 h-5" />
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => setShowMoreOptions(!showMoreOptions)}
+                className={`p-2.5 rounded-lg transition-all ${
+                  showMoreOptions 
+                    ? 'bg-gray-700 text-white' 
+                    : 'bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white'
+                }`}
+                title="More Options"
+              >
+                <MoreVertical className="w-5 h-5" />
+              </button>
+              
+              {/* Dropdown Menu */}
+              {showMoreOptions && (
+                <div className="absolute right-0 top-full mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl -z-50">
+                  <div className="py-2">
+                    {/* Recorded Videos */}
+                    <button className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition-all flex items-center space-x-3 group">
+                      <Radio className="w-4 h-4 text-gray-400 group-hover:text-white" />
+                      <span className="text-sm font-medium">Recorded videos</span>
+                    </button>
+                    
+                    {/* Virtual Background */}
+                    <button className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition-all flex items-center space-x-3 group">
+                      <Palette className="w-4 h-4 text-gray-400 group-hover:text-white" />
+                      <span className="text-sm font-medium">Virtual background</span>
+                    </button>
+                    
+                    {/* Whiteboard */}
+                    <button className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition-all flex items-center space-x-3 group">
+                      <FileText className="w-4 h-4 text-gray-400 group-hover:text-white" />
+                      <span className="text-sm font-medium">Whiteboard</span>
+                    </button>
+                    
+                    {/* Breakout Rooms */}
+                    <button className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition-all flex items-center space-x-3 group">
+                      <UsersRound className="w-4 h-4 text-gray-400 group-hover:text-white" />
+                      <span className="text-sm font-medium">Breakout rooms</span>
+                    </button>
+                    
+                    {/* Divider */}
+                    <div className="border-t border-gray-700 my-1"></div>
+                    
+                    {/* End Meeting for All */}
+                    <button className="w-full px-4 py-3 text-left text-red-400 hover:bg-red-600/20 hover:text-red-300 transition-all flex items-center space-x-3 group">
+                      <Power className="w-4 h-4 text-red-400 group-hover:text-red-300" />
+                      <span className="text-sm font-medium">End meeting for all</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>
