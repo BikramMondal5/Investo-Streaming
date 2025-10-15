@@ -2,6 +2,7 @@ import React, { useEffect, useCallback, useState, useRef } from "react";
 import ReactPlayer from "react-player";
 import peer from "../service/peer";
 import { useSocket } from "../context/SocketProvider";
+import { useNavigate } from "react-router-dom";
 import { 
   Mic, MicOff, Video, VideoOff, MonitorUp, Users, 
   MessageSquare, Settings, MoreVertical, PhoneOff, Phone,
@@ -11,6 +12,7 @@ import {
 
 const RoomPage = () => {
   const socket = useSocket();
+  const navigate = useNavigate();
   const [remoteSocketId, setRemoteSocketId] = useState(null);
   const [myStream, setMyStream] = useState();
   const [remoteStream, setRemoteStream] = useState();
@@ -19,6 +21,7 @@ const RoomPage = () => {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [screenSharingStream, setScreenSharingStream] = useState(null);
   const [isHandRaised, setIsHandRaised] = useState(false);
+  const [remoteHandRaised, setRemoteHandRaised] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -110,6 +113,11 @@ const RoomPage = () => {
     await peer.setLocalDescription(ans);
   }, []);
 
+  // Handle remote user hand raise
+  const handleRemoteHandRaise = useCallback(({ isRaised }) => {
+    setRemoteHandRaised(isRaised);
+  }, []);
+
   useEffect(() => {
     peer.peer.addEventListener("track", async (ev) => {
       const remoteStream = ev.streams;
@@ -133,6 +141,7 @@ const RoomPage = () => {
     socket.on("call:accepted", handleCallAccepted);
     socket.on("peer:nego:needed", handleNegoNeedIncomming);
     socket.on("peer:nego:final", handleNegoNeedFinal);
+    socket.on("hand:raised", handleRemoteHandRaise);
 
     return () => {
       // Clean up screen sharing when component unmounts
@@ -145,6 +154,7 @@ const RoomPage = () => {
       socket.off("call:accepted", handleCallAccepted);
       socket.off("peer:nego:needed", handleNegoNeedIncomming);
       socket.off("peer:nego:final", handleNegoNeedFinal);
+      socket.off("hand:raised", handleRemoteHandRaise);
     };
   }, [
     socket,
@@ -153,6 +163,7 @@ const RoomPage = () => {
     handleCallAccepted,
     handleNegoNeedIncomming,
     handleNegoNeedFinal,
+    handleRemoteHandRaise,
     screenSharingStream,
   ]);
 
@@ -245,6 +256,48 @@ const RoomPage = () => {
       console.error('Error stopping screen share:', error);
     }
   }, [screenSharingStream]);
+
+  // End call and leave room
+  const handleEndCall = useCallback(() => {
+    // Stop all media tracks
+    if (myStream) {
+      myStream.getTracks().forEach(track => track.stop());
+    }
+    if (screenSharingStream) {
+      screenSharingStream.getTracks().forEach(track => track.stop());
+    }
+    
+    // Close peer connection
+    if (peer.peer) {
+      peer.peer.close();
+    }
+    
+    // Navigate back to lobby
+    navigate('/');
+  }, [myStream, screenSharingStream, navigate]);
+
+  // Toggle hand raise and broadcast to remote user
+  const toggleHandRaise = useCallback(() => {
+    const newHandRaisedState = !isHandRaised;
+    setIsHandRaised(newHandRaisedState);
+    
+    // Broadcast hand raise state to remote user
+    if (remoteSocketId) {
+      socket.emit("hand:raised", { to: remoteSocketId, isRaised: newHandRaisedState });
+    }
+  }, [isHandRaised, remoteSocketId, socket]);
+
+  // Copy invite link to clipboard
+  const copyInviteLink = useCallback(() => {
+    const inviteLink = window.location.href;
+    navigator.clipboard.writeText(inviteLink)
+      .then(() => {
+        alert('Invite link copied to clipboard!');
+      })
+      .catch(err => {
+        console.error('Failed to copy link:', err);
+      });
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex flex-col">
@@ -370,6 +423,13 @@ const RoomPage = () => {
                   <div className="w-2 h-2 rounded-full bg-green-500"></div>
                   <span className="font-medium">Remote User</span>
                 </div>
+                {/* Remote User Hand Raised Indicator */}
+                {remoteHandRaised && (
+                  <div className="absolute top-4 left-4 bg-yellow-500 px-3 py-2 rounded-lg flex items-center space-x-2 animate-bounce">
+                    <Hand className="w-5 h-5 text-white" />
+                    <span className="text-white font-medium text-sm">Hand Raised</span>
+                  </div>
+                )}
                 {/* Video Controls Overlay */}
                 <div className="absolute top-4 right-4 flex space-x-2">
                   <button className="p-2 bg-gray-900/80 hover:bg-gray-800 rounded-lg transition-all">
@@ -447,7 +507,7 @@ const RoomPage = () => {
                     >
                       {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
                     </button>
-                    <ChevronDown className="absolute -bottom-1 right-1 w-4 h-4 text-gray-400 group-hover:text-white cursor-pointer" />
+                    {/* <ChevronDown className="absolute -bottom-1 right-1 w-4 h-4 text-gray-400 group-hover:text-white cursor-pointer" /> */}
                   </div>
 
                   {/* Camera Control */}
@@ -463,7 +523,7 @@ const RoomPage = () => {
                     >
                       {isCameraOff ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
                     </button>
-                    <ChevronDown className="absolute -bottom-1 right-1 w-4 h-4 text-gray-400 group-hover:text-white cursor-pointer" />
+                    {/* <ChevronDown className="absolute -bottom-1 right-1 w-4 h-4 text-gray-400 group-hover:text-white cursor-pointer" /> */}
                   </div>
                 </>
               )}
@@ -499,7 +559,7 @@ const RoomPage = () => {
 
                   {/* Raise Hand */}
                   <button 
-                    onClick={() => setIsHandRaised(!isHandRaised)}
+                    onClick={toggleHandRaise}
                     className={`p-3 rounded-xl transition-all duration-200 ${
                       isHandRaised 
                         ? 'bg-yellow-500 hover:bg-yellow-600 text-white shadow-lg shadow-yellow-500/50' 
@@ -556,8 +616,9 @@ const RoomPage = () => {
             <div className="flex items-center space-x-3">
               {/* End Call Button */}
               <button 
+                onClick={handleEndCall}
                 className="px-5 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl transition-all shadow-lg shadow-red-500/50 flex items-center space-x-2 font-medium"
-                title="End call"
+                title="End call and leave room"
               >
                 <PhoneOff className="w-5 h-5" />
                 <span className="hidden md:inline">End</span>
@@ -574,7 +635,10 @@ const RoomPage = () => {
               </span>
               <span>Room ID: {remoteSocketId ? remoteSocketId.substring(0, 8) + '...' : 'N/A'}</span>
             </div>
-            <button className="flex items-center space-x-1 hover:text-blue-400 transition-colors">
+            <button 
+              onClick={copyInviteLink}
+              className="flex items-center space-x-1 hover:text-blue-400 transition-colors"
+            >
               <Copy className="w-3 h-3" />
               <span>Copy Invite Link</span>
             </button>

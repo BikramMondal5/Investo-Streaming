@@ -44,6 +44,11 @@ io.on("connection", (socket) => {
     io.to(to).emit("peer:nego:final", { from: socket.id, ans });
   });
 
+  socket.on("hand:raised", ({ to, isRaised }) => {
+    console.log("hand:raised", { from: socket.id, to, isRaised });
+    io.to(to).emit("hand:raised", { from: socket.id, isRaised });
+  });
+
   socket.on("disconnect", () => {
     console.log(`Socket Disconnected`, socket.id);
     const email = socketidToEmailMap.get(socket.id);
