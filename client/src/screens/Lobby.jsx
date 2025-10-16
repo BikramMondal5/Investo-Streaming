@@ -114,6 +114,51 @@ const LobbyScreen = () => {
             By joining, you agree to our Terms of Service and Privacy Policy
           </p>
         </div>
+
+        {/* Instructions Section */}
+        <div className="bg-gray-750 border-t border-gray-700 py-6 px-8">
+          <div className="flex items-center mb-4">
+            <svg className="w-5 h-5 text-blue-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h3 className="text-sm font-semibold text-gray-200">How to Join</h3>
+          </div>
+          
+          <div className="space-y-3">
+            <div className="flex items-start group hover:bg-gray-700/30 rounded-md p-2 transition-all duration-200">
+              <div className="flex-shrink-0 mt-0.5">
+                <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold text-white">
+                  1
+                </div>
+              </div>
+              <p className="ml-3 text-sm text-gray-300 leading-relaxed">
+                Enter your <span className="text-blue-400 font-medium">email address</span> and the <span className="text-blue-400 font-medium">Room ID</span> provided by the meeting host
+              </p>
+            </div>
+            
+            <div className="flex items-start group hover:bg-gray-700/30 rounded-md p-2 transition-all duration-200">
+              <div className="flex-shrink-0 mt-0.5">
+                <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold text-white">
+                  2
+                </div>
+              </div>
+              <p className="ml-3 text-sm text-gray-300 leading-relaxed">
+                Click <span className="text-blue-400 font-medium">"Join Meeting"</span> to connect to the video conference room
+              </p>
+            </div>
+            
+            <div className="flex items-start group hover:bg-gray-700/30 rounded-md p-2 transition-all duration-200">
+              <div className="flex-shrink-0 mt-0.5">
+                <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold text-white">
+                  3
+                </div>
+              </div>
+              <p className="ml-3 text-sm text-gray-300 leading-relaxed">
+                Grant <span className="text-blue-400 font-medium">camera and microphone</span> permissions when prompted for full meeting experience
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
